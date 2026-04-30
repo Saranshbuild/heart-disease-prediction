@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+backend/models/pipeline.joblib
+
+# Node
+frontend/node_modules/
+frontend/build/
+
+# OS
+.DS_Store
+.env
