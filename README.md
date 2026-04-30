@@ -2,6 +2,7 @@
 
 A full-stack ML web application based on:
 > *"Heart Disease Risk Prediction: Evaluating Machine Learning Algorithms with Feature Reduction using LDA"*
+> — Nasution et al., Universitas Lancang Kuning
 
 ---
 
@@ -10,11 +11,11 @@ A full-stack ML web application based on:
 ```
 heart-app/
 ├── backend/
-│   ├── app.py              # Flask API server
+│   ├── app.py              # Flask API server (port 8080)
 │   ├── ml_pipeline.py      # ML training & prediction pipeline
-│   ├── heart.csv           # Dataset (Heart Disease UCI)
+│   ├── heart.csv           # Dataset (Heart Disease UCI, 918 patients)
 │   ├── requirements.txt
-│   └── models/             # Auto-generated after training
+│   └── models/             # Auto-generated on first run (gitignored)
 │       └── pipeline.joblib
 └── frontend/
     ├── package.json
@@ -40,50 +41,61 @@ heart-app/
 
 ```bash
 cd backend
-
-# Install dependencies
 pip install -r requirements.txt
-
-# (Optional) Pre-train models
-python ml_pipeline.py
-
-# Start API server
 python app.py
-# → Running on http://localhost:5000
+# → Running on http://localhost:8080
 ```
 
-The pipeline auto-trains on first startup if no saved model is found.
-
----
+> Models auto-train on first run and save to `backend/models/pipeline.joblib`.
+> To retrain from scratch, delete that file and restart.
 
 ### 2. Frontend (React)
 
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
-
-# Start dev server
 npm start
 # → Opens http://localhost:3000
 ```
 
-The React dev server proxies `/api/*` to `http://localhost:5000`.
+> Make sure Flask is running on port 8080 before starting the frontend.
+
+---
+
+## Features
+
+- 4 ML models — Logistic Regression, Random Forest, SVM, KNN
+- LDA feature reduction before training
+- Smart form — only asks top 6 LDA-identified features
+- All models comparison — predictions from all 4 models side by side
+- Model consensus indicator
+- Dark / Light theme toggle
+- Auto best model selection at runtime
 
 ---
 
 ## API Endpoints
 
+Base URL: `http://localhost:8080`
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/health` | Health check |
 | GET | `/api/info` | Model metadata, top features, metrics |
-| POST | `/api/predict` | Run prediction |
+| POST | `/api/predict` | Run prediction across all models |
 | POST | `/api/train` | Force retrain all models |
+
+### GET /api/health
+```json
+{ "status": "ok" }
+```
+
+### GET /api/info
+Returns available models, best model, top features, accuracy metrics, and dataset stats.
 
 ### POST /api/predict
 
+Request:
 ```json
 {
   "features": {
@@ -106,43 +118,45 @@ Response:
   "risk_level": "High",
   "model_used": "SVM",
   "best_model": "Logistic Regression",
-  "metrics": { "accuracy": 85.87, "precision": 0.863, "recall": 0.8587, "f1": 0.857 }
+  "metrics": { "accuracy": 85.87, "precision": 0.863, "recall": 0.859, "f1": 0.857 },
+  "all_models": {
+    "Logistic Regression": { "prediction": 1, "probability": 91.2, "risk_level": "High" },
+    "Random Forest":        { "prediction": 1, "probability": 78.4, "risk_level": "High" },
+    "SVM":                  { "prediction": 1, "probability": 82.3, "risk_level": "High" },
+    "KNN":                  { "prediction": 0, "probability": 41.0, "risk_level": "Medium" }
+  }
 }
 ```
 
----
-
-## ML Pipeline Details
-
-1. **Preprocessing**: Label encoding for categorical features (Sex, ChestPainType, RestingECG, ExerciseAngina, ST_Slope), StandardScaler normalization
-2. **Feature Reduction**: Linear Discriminant Analysis (LDA) — 1 component for binary classification
-3. **Models trained**: Logistic Regression, Random Forest, SVM (RBF kernel), KNN (k=5)
-4. **Split**: 80% train / 20% test, stratified
-5. **Best model selection**: Automatic by test accuracy
-6. **Top features**: Identified by LDA discriminant coefficients
-
-## Feature Importance (LDA-derived)
-
-The form shows the **top 6 features** by LDA coefficient magnitude. These are typically:
-- ST_Slope, ChestPainType, ExerciseAngina, Cholesterol, Sex, FastingBS
-
-Remaining features (Age, RestingBP, RestingECG, MaxHR, Oldpeak) use dataset medians as defaults.
+### POST /api/train
+Force retrains all models from scratch and returns updated metrics.
 
 ---
 
-## Production Deployment
+## Model Results
 
-### Backend
-```bash
-pip install gunicorn
-gunicorn -w 4 -b 0.0.0.0:5000 app:app
-```
+| Model | Accuracy | F1 |
+|-------|----------|----|
+| **Logistic Regression** ⭐ | **87.5%** | 0.874 |
+| SVM | 85.9% | 0.857 |
+| KNN | 79.9% | 0.799 |
+| Random Forest | 77.7% | 0.777 |
 
-### Frontend
-```bash
-npm run build
-# Serve the build/ folder with nginx or serve
-npx serve -s build -l 3000
-```
+---
 
-For production, update the frontend API base URL in `App.js` to point to your server.
+## Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| `'LogisticRegression' has no attribute 'multi_class'` | Delete `backend/models/pipeline.joblib` and restart Flask |
+| "Failed to connect to server" | Make sure Flask is running on port 8080 |
+| Port 8080 in use | `lsof -ti:8080 \| xargs kill -9` then restart |
+
+---
+
+## Dataset
+
+- **Source**: Heart Disease UCI Dataset (Kaggle)
+- **Patients**: 918
+- **Features**: 12 clinical attributes
+- **Target**: HeartDisease (1 = yes, 0 = no)
